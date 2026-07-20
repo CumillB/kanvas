@@ -260,6 +260,7 @@
     <button id="menuChangeCode">Byt kod</button>
     <button id="menuFind">Hitta ruta</button>
     <button id="menuTransfer">Flytta till annan enhet</button>
+    <button id="menuDebug">Felsökningskonsol: Av</button>
   </div>
   <div id="canvas-scroll">
     <div id="canvas-sizer">
@@ -1128,6 +1129,9 @@
     if (document.hidden && pinHash && lockState === 'none') {
       document.getElementById('settings-menu').style.display = 'none';
       document.getElementById('transfer-overlay').style.display = 'none';
+      if (window.eruda && typeof window.eruda.hide === 'function') {
+        try { window.eruda.hide(); } catch (e) {}
+      }
       showLockScreen('unlock');
     }
   });
@@ -1204,6 +1208,73 @@
     document.getElementById('transfer-status').textContent = '';
     document.getElementById('transfer-overlay').style.display = 'flex';
   });
+
+  // ---- Debug console (Eruda) - off by default, toggled from settings ----
+  var erudaScriptLoading = null;
+  var erudaActive = false;
+  var erudaInitialized = false;
+  var menuDebugEl = document.getElementById('menuDebug');
+
+  function loadErudaScript() {
+    if (window.eruda) return Promise.resolve();
+    if (erudaScriptLoading) return erudaScriptLoading;
+    erudaScriptLoading = new Promise(function (resolve, reject) {
+      var s = document.createElement('script');
+      s.src = 'https://cdn.jsdelivr.net/npm/eruda';
+      s.onload = function () { resolve(); };
+      s.onerror = function () { reject(new Error('Kunde inte ladda felsökningskonsolen.')); };
+      document.head.appendChild(s);
+    });
+    return erudaScriptLoading;
+  }
+
+  function updateDebugLabel() {
+    menuDebugEl.textContent = 'Felsökningskonsol: ' + (erudaActive ? 'På' : 'Av');
+  }
+
+  async function enableEruda() {
+    try {
+      await loadErudaScript();
+      if (!erudaInitialized) {
+        window.eruda.init({ useShadowDom: true });
+        erudaInitialized = true;
+      }
+      window.eruda.position({ x: 16, y: 66 });
+      window.eruda.show();
+      erudaActive = true;
+    } catch (e) {
+      alert('Kunde inte starta felsökningskonsolen: ' + e.message);
+    }
+    updateDebugLabel();
+  }
+
+  function disableEruda() {
+    if (window.eruda && typeof window.eruda.hide === 'function') {
+      try { window.eruda.hide(); } catch (e) {}
+    }
+    erudaActive = false;
+    updateDebugLabel();
+  }
+
+  menuDebugEl.addEventListener('click', function () {
+    settingsMenuEl.style.display = 'none';
+    if (erudaActive) {
+      disableEruda();
+      storageAdapter.set('kanvas-debug-enabled', 'false');
+    } else {
+      enableEruda();
+      storageAdapter.set('kanvas-debug-enabled', 'true');
+    }
+  });
+
+  (async function initDebugConsole() {
+    try {
+      var pref = await storageAdapter.get('kanvas-debug-enabled');
+      if (pref && pref.value === 'true') {
+        await enableEruda();
+      }
+    } catch (e) { /* stays off by default */ }
+  })();
 
   // ---- Move to another device (export/import everything Kanvas has stored) ----
   function utf8ToBase64(str) {
