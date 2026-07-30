@@ -49,10 +49,11 @@
   #canvas-scroll {
     position: absolute; top: 56px; left: 0; right: 0; bottom: 0;
     overflow: auto; -webkit-overflow-scrolling: touch;
+    touch-action: none;
   }
-  #canvas-sizer { position: relative; width: 4000px; height: 4000px; }
+  #canvas-sizer { position: relative; width: 8000px; height: 8000px; }
   #canvas {
-    position: absolute; top: 0; left: 0; width: 4000px; height: 4000px;
+    position: absolute; top: 0; left: 0; width: 8000px; height: 8000px;
     transform-origin: 0 0;
     background-color: #0F1720;
     background-image:
@@ -307,7 +308,7 @@
 (function () {
   "use strict";
 
-  var CANVAS_SIZE = 4000;
+  var CANVAS_SIZE = 8000;
   var BOX_HALF_WIDTH = 150;
   var fullscreenBoxId = null;
   var LOCK_DIGITS = 6;
@@ -417,6 +418,7 @@
   var pinchStartDist = null;
   var pinchStartZoom = null;
   var pinchStartMid = null;
+  var panStartX = null, panStartY = null, panStartScrollLeft = null, panStartScrollTop = null;
 
   function pointDist(a, b) {
     return Math.sqrt((a.x - b.x) * (a.x - b.x) + (a.y - b.y) * (a.y - b.y));
@@ -429,11 +431,15 @@
     if (e.target.closest('.box')) return; // let the box (textarea, 3D view, ...) own its own gestures
     activePointers[e.pointerId] = { x: e.clientX, y: e.clientY };
     var keys = Object.keys(activePointers);
-    if (keys.length === 2) {
+    if (keys.length === 1) {
+      panStartX = e.clientX; panStartY = e.clientY;
+      panStartScrollLeft = scrollEl.scrollLeft; panStartScrollTop = scrollEl.scrollTop;
+    } else if (keys.length === 2) {
       var a = activePointers[keys[0]], b = activePointers[keys[1]];
       pinchStartDist = pointDist(a, b);
       pinchStartZoom = zoom;
       pinchStartMid = pointMid(a, b);
+      panStartX = null;
     }
   });
   scrollEl.addEventListener('pointermove', function (e) {
@@ -446,11 +452,23 @@
       var ratio = pointDist(a, b) / pinchStartDist;
       var rect = scrollEl.getBoundingClientRect();
       applyZoom(pinchStartZoom * ratio, pinchStartMid.x - rect.left, pinchStartMid.y - rect.top);
+    } else if (keys.length === 1 && panStartX !== null) {
+      e.preventDefault();
+      scrollEl.scrollLeft = panStartScrollLeft - (e.clientX - panStartX);
+      scrollEl.scrollTop = panStartScrollTop - (e.clientY - panStartY);
     }
   }, { passive: false });
   function endPointerTrack(e) {
     delete activePointers[e.pointerId];
-    if (Object.keys(activePointers).length < 2) pinchStartDist = null;
+    var remaining = Object.keys(activePointers);
+    if (remaining.length < 2) pinchStartDist = null;
+    if (remaining.length === 1) {
+      var k = remaining[0];
+      panStartX = activePointers[k].x; panStartY = activePointers[k].y;
+      panStartScrollLeft = scrollEl.scrollLeft; panStartScrollTop = scrollEl.scrollTop;
+    } else if (remaining.length === 0) {
+      panStartX = null;
+    }
   }
   scrollEl.addEventListener('pointerup', endPointerTrack);
   scrollEl.addEventListener('pointercancel', endPointerTrack);
