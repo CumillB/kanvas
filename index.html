@@ -712,6 +712,13 @@
     box._returnNext = boxEl.nextSibling;
     document.body.appendChild(boxEl);
     boxEl.classList.add('fullscreen');
+    // The box carries inline left/top/z-index from its position on the
+    // canvas, and inline styles always beat CSS classes - without clearing
+    // them here, the .fullscreen rule's top:0/left:0 gets silently
+    // overridden and the box renders far outside the visible viewport.
+    boxEl.style.left = '';
+    boxEl.style.top = '';
+    boxEl.style.zIndex = '';
     fullscreenBoxId = box.id;
     var btn = boxEl.querySelector('.fullscreen-btn');
     if (btn) { btn.innerHTML = ICON_BOX_SHRINK; btn.setAttribute('aria-label', 'Återställ'); }
