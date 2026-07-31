@@ -1,4 +1,4 @@
-name: Build Android APK
+        name: Build Android APK
 
 on:
   push:
@@ -21,7 +21,7 @@ jobs:
       - uses: actions/setup-java@v5
         with:
           distribution: 'zulu'
-          java-version: '17'
+          java-version: '21'
 
       - name: Prepare web assets
         run: |
