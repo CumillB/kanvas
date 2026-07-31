@@ -49,10 +49,11 @@
   #canvas-scroll {
     position: absolute; top: 56px; left: 0; right: 0; bottom: 0;
     overflow: auto; -webkit-overflow-scrolling: touch;
+    touch-action: none;
   }
-  #canvas-sizer { position: relative; width: 4000px; height: 4000px; }
+  #canvas-sizer { position: relative; width: 8000px; height: 8000px; }
   #canvas {
-    position: absolute; top: 0; left: 0; width: 4000px; height: 4000px;
+    position: absolute; top: 0; left: 0; width: 8000px; height: 8000px;
     transform-origin: 0 0;
     background-color: #0F1720;
     background-image:
@@ -126,8 +127,8 @@
   .delete-btn:active { color: #D96C6C; }
   .box-code {
     font-family: 'IBM Plex Mono', monospace; font-size: 13px; color: #DCE6EC;
-    background: #0F1720; border: none; padding: 10px; min-height: 90px;
-    resize: vertical; outline: none; line-height: 1.5; width: 100%; display: block;
+    background: #0F1720; border: none; padding: 10px 10px 10px 4px; min-height: 90px;
+    resize: vertical; outline: none; line-height: 1.5; flex: 1; min-width: 0; display: block;
   }
   .run-btn {
     background: transparent; color: #E8A33D; border: none;
@@ -243,6 +244,32 @@
     #lock-keypad button { width: 50px; height: 50px; font-size: 19px; }
   }
   textarea:focus, button:focus-visible { outline: 2px solid #E8A33D; outline-offset: 1px; }
+
+  .connect-btn {
+    background: none; border: none; color: #7C93A3; width: 32px; height: 32px;
+    display: flex; align-items: center; justify-content: center; border-radius: 8px; cursor: pointer;
+  }
+  .connect-btn.active { color: #E8A33D; background: rgba(232,163,61,0.15); }
+
+  .box-undo-link {
+    font-size: 11px; color: #E8A33D; opacity: 0; transition: opacity 0.25s ease; flex-shrink: 0;
+    cursor: pointer; text-decoration: underline; touch-action: manipulation;
+    background: none; border: none; padding: 0; font-family: inherit;
+  }
+  .box-undo-link.show { opacity: 1; }
+
+  .box-code-wrap { display: flex; background: #0F1720; }
+  .box-linenos {
+    flex-shrink: 0; padding: 10px 4px 10px 10px; text-align: right;
+    color: #45596A; font-family: 'IBM Plex Mono', monospace; font-size: 13px; line-height: 1.5;
+    overflow: hidden; user-select: none; white-space: pre;
+  }
+
+  #connections-svg { position: absolute; top: 0; left: 0; pointer-events: none; }
+  .connection-line { stroke: #7C93A3; stroke-width: 2; }
+  .connection-hit { stroke: transparent; stroke-width: 18; pointer-events: stroke; cursor: pointer; }
+  .connection-hit:active + .connection-line { stroke: #E8A33D; stroke-width: 3; }
+  .box.connect-pending { outline: 2px solid #E8A33D; outline-offset: 2px; }
 </style>
 </head>
 <body>
@@ -252,6 +279,7 @@
       <button class="lock-btn" id="settingsBtn" aria-label="Inställningar"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg></button>
     </div>
     <div class="toolbar-right">
+      <button class="connect-btn" id="connectBtn" aria-label="Koppla rutor"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg></button>
       <span class="status" id="status"></span>
       <button class="add-btn" id="addBtn">+ Ny ruta</button>
     </div>
@@ -307,7 +335,7 @@
 (function () {
   "use strict";
 
-  var CANVAS_SIZE = 4000;
+  var CANVAS_SIZE = 8000;
   var BOX_HALF_WIDTH = 150;
   var fullscreenBoxId = null;
   var LOCK_DIGITS = 6;
@@ -326,6 +354,9 @@
   var canvasEl = document.getElementById('canvas');
   var sizerEl = document.getElementById('canvas-sizer');
   var scrollEl = document.getElementById('canvas-scroll');
+  var connections = [];
+  var connectMode = false;
+  var pendingConnectId = null;
 
   // Works inside a Claude artifact (window.storage) and falls back to
   // localStorage automatically when this file is hosted standalone.
@@ -417,6 +448,7 @@
   var pinchStartDist = null;
   var pinchStartZoom = null;
   var pinchStartMid = null;
+  var panStartX = null, panStartY = null, panStartScrollLeft = null, panStartScrollTop = null;
 
   function pointDist(a, b) {
     return Math.sqrt((a.x - b.x) * (a.x - b.x) + (a.y - b.y) * (a.y - b.y));
@@ -429,11 +461,15 @@
     if (e.target.closest('.box')) return; // let the box (textarea, 3D view, ...) own its own gestures
     activePointers[e.pointerId] = { x: e.clientX, y: e.clientY };
     var keys = Object.keys(activePointers);
-    if (keys.length === 2) {
+    if (keys.length === 1) {
+      panStartX = e.clientX; panStartY = e.clientY;
+      panStartScrollLeft = scrollEl.scrollLeft; panStartScrollTop = scrollEl.scrollTop;
+    } else if (keys.length === 2) {
       var a = activePointers[keys[0]], b = activePointers[keys[1]];
       pinchStartDist = pointDist(a, b);
       pinchStartZoom = zoom;
       pinchStartMid = pointMid(a, b);
+      panStartX = null;
     }
   });
   scrollEl.addEventListener('pointermove', function (e) {
@@ -446,11 +482,23 @@
       var ratio = pointDist(a, b) / pinchStartDist;
       var rect = scrollEl.getBoundingClientRect();
       applyZoom(pinchStartZoom * ratio, pinchStartMid.x - rect.left, pinchStartMid.y - rect.top);
+    } else if (keys.length === 1 && panStartX !== null) {
+      e.preventDefault();
+      scrollEl.scrollLeft = panStartScrollLeft - (e.clientX - panStartX);
+      scrollEl.scrollTop = panStartScrollTop - (e.clientY - panStartY);
     }
   }, { passive: false });
   function endPointerTrack(e) {
     delete activePointers[e.pointerId];
-    if (Object.keys(activePointers).length < 2) pinchStartDist = null;
+    var remaining = Object.keys(activePointers);
+    if (remaining.length < 2) pinchStartDist = null;
+    if (remaining.length === 1) {
+      var k = remaining[0];
+      panStartX = activePointers[k].x; panStartY = activePointers[k].y;
+      panStartScrollLeft = scrollEl.scrollLeft; panStartScrollTop = scrollEl.scrollTop;
+    } else if (remaining.length === 0) {
+      panStartX = null;
+    }
   }
   scrollEl.addEventListener('pointerup', endPointerTrack);
   scrollEl.addEventListener('pointercancel', endPointerTrack);
@@ -498,7 +546,7 @@
   function persist() {
     setStatus('Sparar…');
     var touched = lastTouchedBoxId;
-    var payload = JSON.stringify({ boxes: boxes.map(serializeBox), nextNum: nextNum });
+    var payload = JSON.stringify({ boxes: boxes.map(serializeBox), nextNum: nextNum, connections: connections });
     storageAdapter.set('kanvas-boxes', payload).then(function () {
       setStatus('Sparat');
       clearTimeout(statusTimer);
@@ -515,10 +563,12 @@
         var parsed = JSON.parse(result.value);
         boxes = parsed.boxes || [];
         nextNum = parsed.nextNum || (boxes.length + 1);
+        connections = parsed.connections || [];
       }
     }).catch(function () {
       boxes = [];
       nextNum = 1;
+      connections = [];
     });
   }
 
@@ -653,7 +703,8 @@
     var dragging = false, startX, startY, origX, origY;
     header.addEventListener('pointerdown', function (e) {
       if (el.classList.contains('fullscreen')) return;
-      if (e.target.closest('.delete-btn') || e.target.closest('.box-name') || e.target.closest('.fullscreen-btn')) return;
+      if (e.target.closest('.delete-btn') || e.target.closest('.box-name') || e.target.closest('.fullscreen-btn') || e.target.closest('.duplicate-btn')) return;
+      if (connectMode) { handleConnectTap(box, el); return; }
       dragging = true;
       header.setPointerCapture(e.pointerId);
       startX = e.clientX; startY = e.clientY;
@@ -667,11 +718,13 @@
       box.y = origY + (e.clientY - startY) / zoom;
       el.style.left = box.x + 'px';
       el.style.top = box.y + 'px';
+      renderConnections();
     });
     function endDrag() {
       if (!dragging) return;
       dragging = false;
       el.classList.remove('dragging');
+      renderConnections();
       schedulePersist(box.id);
     }
     header.addEventListener('pointerup', endDrag);
@@ -680,6 +733,112 @@
 
   var ICON_BOX_EXPAND = '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="8 3 3 3 3 8"/><polyline points="16 3 21 3 21 8"/><polyline points="3 16 3 21 8 21"/><polyline points="21 16 21 21 16 21"/></svg>';
   var ICON_BOX_SHRINK = '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="4 14 10 14 10 20"/><polyline points="20 10 14 10 14 4"/><polyline points="14 20 14 14 20 14"/><polyline points="10 4 10 10 4 10"/></svg>';
+  var ICON_DUPLICATE = '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>';
+
+  // ---- Connections (arrows between boxes) ----
+  var SVG_NS = 'http://www.w3.org/2000/svg';
+  var connectionsSvgEl = document.createElementNS(SVG_NS, 'svg');
+  connectionsSvgEl.setAttribute('id', 'connections-svg');
+  connectionsSvgEl.setAttribute('width', String(CANVAS_SIZE));
+  connectionsSvgEl.setAttribute('height', String(CANVAS_SIZE));
+  (function setupArrowMarker() {
+    var defs = document.createElementNS(SVG_NS, 'defs');
+    var marker = document.createElementNS(SVG_NS, 'marker');
+    marker.setAttribute('id', 'arrowhead');
+    marker.setAttribute('viewBox', '0 0 10 10');
+    marker.setAttribute('refX', '8');
+    marker.setAttribute('refY', '5');
+    marker.setAttribute('markerWidth', '7');
+    marker.setAttribute('markerHeight', '7');
+    marker.setAttribute('orient', 'auto-start-reverse');
+    var arrowPath = document.createElementNS(SVG_NS, 'path');
+    arrowPath.setAttribute('d', 'M 0 0 L 10 5 L 0 10 z');
+    arrowPath.setAttribute('fill', '#7C93A3');
+    marker.appendChild(arrowPath);
+    defs.appendChild(marker);
+    connectionsSvgEl.appendChild(defs);
+  })();
+  canvasEl.appendChild(connectionsSvgEl);
+
+  function renderConnections() {
+    while (connectionsSvgEl.childNodes.length > 1) {
+      connectionsSvgEl.removeChild(connectionsSvgEl.lastChild);
+    }
+    connections.forEach(function (conn) {
+      var a = findBox(conn.from), b = findBox(conn.to);
+      if (!a || !b) return;
+      var aEl = document.getElementById('box-' + a.id);
+      var bEl = document.getElementById('box-' + b.id);
+      var aw = aEl ? aEl.offsetWidth : 300, ah = aEl ? aEl.offsetHeight : 60;
+      var bw = bEl ? bEl.offsetWidth : 300, bh = bEl ? bEl.offsetHeight : 60;
+      var x1 = a.x + aw / 2, y1 = a.y + ah / 2;
+      var x2 = b.x + bw / 2, y2 = b.y + bh / 2;
+      var group = document.createElementNS(SVG_NS, 'g');
+      var hit = document.createElementNS(SVG_NS, 'line');
+      hit.setAttribute('class', 'connection-hit');
+      hit.setAttribute('x1', x1); hit.setAttribute('y1', y1);
+      hit.setAttribute('x2', x2); hit.setAttribute('y2', y2);
+      hit.addEventListener('click', function () { confirmRemoveConnection(conn.id); });
+      var line = document.createElementNS(SVG_NS, 'line');
+      line.setAttribute('class', 'connection-line');
+      line.setAttribute('x1', x1); line.setAttribute('y1', y1);
+      line.setAttribute('x2', x2); line.setAttribute('y2', y2);
+      line.setAttribute('marker-end', 'url(#arrowhead)');
+      group.appendChild(hit);
+      group.appendChild(line);
+      connectionsSvgEl.appendChild(group);
+    });
+  }
+
+  function addConnection(fromId, toId) {
+    if (fromId === toId) return;
+    var exists = connections.some(function (c) {
+      return (c.from === fromId && c.to === toId) || (c.from === toId && c.to === fromId);
+    });
+    if (exists) return;
+    connections.push({ id: makeId(), from: fromId, to: toId });
+    renderConnections();
+    schedulePersist();
+  }
+
+  function confirmRemoveConnection(connId) {
+    var conn = connections.filter(function (c) { return c.id === connId; })[0];
+    if (!conn) return;
+    connections = connections.filter(function (c) { return c.id !== connId; });
+    renderConnections();
+    schedulePersist();
+    showUndoToast('Koppling borttagen', function () {
+      connections.push(conn);
+      renderConnections();
+      schedulePersist();
+    });
+  }
+
+  function setConnectMode(on) {
+    connectMode = on;
+    pendingConnectId = null;
+    document.getElementById('connectBtn').classList.toggle('active', on);
+    Array.prototype.forEach.call(document.querySelectorAll('.box.connect-pending'), function (elx) {
+      elx.classList.remove('connect-pending');
+    });
+  }
+
+  function handleConnectTap(box, boxEl) {
+    if (!pendingConnectId) {
+      pendingConnectId = box.id;
+      boxEl.classList.add('connect-pending');
+      return;
+    }
+    if (pendingConnectId === box.id) {
+      boxEl.classList.remove('connect-pending');
+      pendingConnectId = null;
+      return;
+    }
+    addConnection(pendingConnectId, box.id);
+    var prevEl = document.getElementById('box-' + pendingConnectId);
+    if (prevEl) prevEl.classList.remove('connect-pending');
+    pendingConnectId = null;
+  }
 
   // A box's normal position lives inside the zoomed/panned #canvas. Position:
   // fixed on a descendant of a transformed ancestor is scoped to that
@@ -747,20 +906,26 @@
 
   function deleteBox(id) {
     if (fullscreenBoxId === id) fullscreenBoxId = null;
+    if (pendingConnectId === id) pendingConnectId = null;
     var box = findBox(id);
     var snapshot = box ? {
       id: box.id, num: box.num, name: box.name, x: box.x, y: box.y, code: box.code, output: box.output
     } : null;
+    var affectedConnections = connections.filter(function (c) { return c.from === id || c.to === id; });
+    connections = connections.filter(function (c) { return c.from !== id && c.to !== id; });
     boxes = boxes.filter(function (b) { return b.id !== id; });
     var boxCanvasArea = document.getElementById('canvas-' + id);
     if (boxCanvasArea) cleanupCanvas(boxCanvasArea);
     var el = document.getElementById('box-' + id);
     if (el) el.remove();
+    renderConnections();
     schedulePersist();
     if (snapshot) {
       showUndoToast('Ruta borttagen: ' + boxDisplayName(snapshot), function () {
         boxes.push(snapshot);
         canvasEl.appendChild(createBoxElement(snapshot));
+        affectedConnections.forEach(function (c) { connections.push(c); });
+        renderConnections();
         schedulePersist(snapshot.id);
       });
     }
@@ -797,14 +962,26 @@
     savedSpan.id = 'saved-' + box.id;
     savedSpan.textContent = '\u2713 Sparad';
 
+    var undoLink = document.createElement('button');
+    undoLink.className = 'box-undo-link';
+    undoLink.type = 'button';
+    undoLink.textContent = '\u21A9 \u00C5ngra';
+
     headerLeft.appendChild(nameSpan);
     headerLeft.appendChild(savedSpan);
+    headerLeft.appendChild(undoLink);
 
     var delBtn = document.createElement('button');
     delBtn.className = 'delete-btn';
     delBtn.setAttribute('aria-label', 'Ta bort ruta');
     delBtn.textContent = '\u00D7';
     delBtn.addEventListener('click', function () { deleteBox(box.id); });
+
+    var dupBtn = document.createElement('button');
+    dupBtn.className = 'fullscreen-btn duplicate-btn';
+    dupBtn.innerHTML = ICON_DUPLICATE;
+    dupBtn.setAttribute('aria-label', 'Duplicera');
+    dupBtn.addEventListener('click', function () { duplicateBox(box); });
 
     var fsBtn = document.createElement('button');
     fsBtn.className = 'fullscreen-btn';
@@ -815,20 +992,63 @@
     var headerRight = document.createElement('div');
     headerRight.style.cssText = 'display:flex; align-items:center; gap:2px; flex-shrink:0;';
     headerRight.appendChild(fsBtn);
+    headerRight.appendChild(dupBtn);
     headerRight.appendChild(delBtn);
 
     header.appendChild(headerLeft);
     header.appendChild(headerRight);
+
+    var codeWrap = document.createElement('div');
+    codeWrap.className = 'box-code-wrap';
+
+    var linenos = document.createElement('div');
+    linenos.className = 'box-linenos';
 
     var textarea = document.createElement('textarea');
     textarea.className = 'box-code';
     textarea.spellcheck = false;
     textarea.value = box.code;
     textarea.rows = 4;
+
+    function refreshLinenos() {
+      var n = textarea.value.split('\n').length;
+      var out = [];
+      for (var i = 1; i <= n; i++) out.push(i);
+      linenos.textContent = out.join('\n');
+    }
+    refreshLinenos();
+
+    var codeBeforeEdit = box.code;
+    textarea.addEventListener('focus', function () {
+      codeBeforeEdit = box.code;
+    });
+    textarea.addEventListener('blur', function () {
+      if (textarea.value !== codeBeforeEdit) {
+        box.prevCode = codeBeforeEdit;
+        undoLink.classList.add('show');
+      }
+    });
     textarea.addEventListener('input', function () {
       box.code = textarea.value;
+      refreshLinenos();
       schedulePersist(box.id);
     });
+    textarea.addEventListener('scroll', function () {
+      linenos.scrollTop = textarea.scrollTop;
+    });
+
+    undoLink.addEventListener('click', function () {
+      if (box.prevCode === undefined) return;
+      textarea.value = box.prevCode;
+      box.code = box.prevCode;
+      box.prevCode = undefined;
+      refreshLinenos();
+      undoLink.classList.remove('show');
+      schedulePersist(box.id);
+    });
+
+    codeWrap.appendChild(linenos);
+    codeWrap.appendChild(textarea);
 
     var runBtn = document.createElement('button');
     runBtn.className = 'run-btn';
@@ -845,7 +1065,7 @@
     runBtn.addEventListener('click', function () { runBox(box, output, canvasArea, el); });
 
     el.appendChild(header);
-    el.appendChild(textarea);
+    el.appendChild(codeWrap);
     el.appendChild(runBtn);
     el.appendChild(canvasArea);
     el.appendChild(output);
@@ -859,6 +1079,16 @@
     }
 
     return el;
+  }
+
+  function duplicateBox(box) {
+    var copy = {
+      id: makeId(), num: nextNum++, name: box.name ? box.name + ' (kopia)' : '',
+      x: box.x + 24, y: box.y + 24, code: box.code, output: null
+    };
+    boxes.push(copy);
+    canvasEl.appendChild(createBoxElement(copy));
+    schedulePersist(copy.id);
   }
 
   function addBox() {
@@ -890,6 +1120,7 @@
       boxes.forEach(function (box) {
         canvasEl.appendChild(createBoxElement(box));
       });
+      renderConnections();
       requestAnimationFrame(function () {
         scrollEl.scrollLeft = CANVAS_SIZE / 2 - scrollEl.clientWidth / 2;
         scrollEl.scrollTop = CANVAS_SIZE / 2 - scrollEl.clientHeight / 2;
@@ -978,7 +1209,19 @@
     },
     storageGet: function (key) { return storageAdapter.get('kanvas-ext-' + key); },
     storageSet: function (key, value) { return storageAdapter.set('kanvas-ext-' + key, value); },
-    storageDelete: function (key) { return storageAdapter.delete('kanvas-ext-' + key); }
+    storageDelete: function (key) { return storageAdapter.delete('kanvas-ext-' + key); },
+    connectBoxes: function (fromIdOrName, toIdOrName) {
+      var a = findBox(fromIdOrName), b = findBox(toIdOrName);
+      if (!a || !b) return false;
+      addConnection(a.id, b.id);
+      return true;
+    },
+    listConnections: function () {
+      return connections.map(function (c) {
+        var a = findBox(c.from), b = findBox(c.to);
+        return { id: c.id, from: a ? boxDisplayName(a) : null, to: b ? boxDisplayName(b) : null };
+      });
+    }
   };
 
   // ---- App lock (6-digit code) ----
@@ -1380,6 +1623,10 @@
     }
   });
 
+  document.getElementById('connectBtn').addEventListener('click', function () {
+    blurActive();
+    setConnectMode(!connectMode);
+  });
   document.getElementById('addBtn').addEventListener('click', function () { blurActive(); addBox(); });
   document.getElementById('zoomInBtn').addEventListener('click', function () { blurActive(); applyZoom(zoom * 1.25); });
   document.getElementById('zoomOutBtn').addEventListener('click', function () { blurActive(); applyZoom(zoom / 1.25); });
