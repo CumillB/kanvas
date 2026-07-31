@@ -1652,5 +1652,232 @@
   init();
 })();
 </script>
-</body>
+</body><style>
+#chat-toggle-btn{position:fixed;bottom:20px;right:16px;width:52px;height:52px;border-radius:50%;border:none;background:#E8A33D;color:#0F1720;font-size:22px;z-index:1000;box-shadow:0 4px 16px rgba(0,0,0,.4);display:none;}
+#chat-panel{display:none;position:fixed;inset:0;z-index:1150;background:#0F1720;flex-direction:column;font-family:'IBM Plex Mono',monospace;}
+.chat-panel-header{display:flex;justify-content:space-between;align-items:center;padding:12px 14px;border-bottom:1px solid #2A3B47;}
+.chat-add-row{display:flex;gap:8px;padding:10px 14px;}
+.chat-add-row input,#chat-input{flex:1;background:#0F1720;color:#DCE6EC;border:1px solid #2A3B47;border-radius:8px;padding:8px;font-size:13px;font-family:'IBM Plex Mono',monospace;}
+.chat-layout{display:flex;flex:1;overflow:hidden;}
+#friend-list{width:110px;overflow-y:auto;list-style:none;padding:0;margin:0;border-right:1px solid #2A3B47;}
+#friend-list li{padding:10px 8px;font-size:12px;cursor:pointer;color:#DCE6EC;}
+.chat-col{flex:1;display:flex;flex-direction:column;}
+#chat-messages{flex:1;overflow-y:auto;padding:10px;}
+.chat-bubble{max-width:75%;padding:8px 12px;border-radius:12px;margin-bottom:8px;font-size:13px;color:#DCE6EC;word-break:break-word;}
+.chat-bubble.mine{background:#4a7dfc;margin-left:auto;}
+.chat-bubble.theirs{background:#1C2B36;}
+.chat-input-row{display:flex;gap:8px;padding:10px;border-top:1px solid #2A3B47;}
+.chat-add-code-btn{margin-top:6px;padding:4px 8px;border-radius:6px;border:none;background:#48bb78;color:#fff;font-size:11px;}
+.pending-row{display:flex;align-items:center;gap:8px;padding:6px 0;font-size:12px;color:#DCE6EC;}
+</style>
+
+<button id="chat-toggle-btn">💬</button>
+<div id="chat-panel">
+  <div class="chat-panel-header">
+    <span style="font-family:'Space Grotesk',sans-serif;font-weight:700;color:#DCE6EC;font-size:15px;">Vänner</span>
+    <button id="chat-panel-close" style="background:none;border:none;color:#7C93A3;font-size:20px;">&times;</button>
+  </div>
+  <div class="chat-add-row">
+    <input id="add-friend-input" placeholder="Användarnamn" />
+    <button id="add-friend-btn" style="background:#E8A33D;color:#0F1720;border:none;border-radius:8px;padding:8px 12px;font-weight:600;font-size:13px;">Lägg till</button>
+  </div>
+  <div id="pending-requests" style="padding:0 14px;"></div>
+  <div class="chat-layout">
+    <ul id="friend-list"></ul>
+    <div class="chat-col">
+      <div id="chat-messages"></div>
+      <div class="chat-input-row">
+        <input id="chat-input" placeholder="Skriv..." />
+        <button id="chat-paste-btn" style="background:#1C2B36;border:1px solid #2A3B47;color:#DCE6EC;border-radius:8px;padding:8px 10px;">📋</button>
+        <button id="chat-send-btn" style="background:#E8A33D;color:#0F1720;border:none;border-radius:8px;padding:8px 14px;font-weight:600;font-size:13px;">Skicka</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+(function () {
+  "use strict";
+  var _supabase = supabase.createClient('https://atubqjjjnhfjcogbshxs.supabase.co', 'sb_publishable_iglai8z88iouTRuXiGKy1Q_KdNYkSsU');
+  var FAKE_EMAIL_DOMAIN = 'kanvas.internal';
+  function usernameToEmail(u) { return u.trim().toLowerCase().replace(/[^a-z0-9_.-]/g, '') + '@' + FAKE_EMAIL_DOMAIN; }
+
+  var authMode = 'login', friendsList = [], pendingIncoming = [], activeChatFriendId = null, messagesByFriend = {};
+
+  async function registerUser(username, password) {
+    var r = await _supabase.auth.signUp({ email: usernameToEmail(username), password: password });
+    if (r.error) throw new Error(r.error.message.indexOf('already') !== -1 ? 'Användarnamnet är upptaget' : r.error.message);
+    var p = await _supabase.from('profiles').insert({ id: r.data.user.id, username: username.trim() });
+    if (p.error) throw new Error(p.error.code === '23505' ? 'Användarnamnet är upptaget' : p.error.message);
+  }
+  async function loginUser(username, password) {
+    var r = await _supabase.auth.signInWithPassword({ email: usernameToEmail(username), password: password });
+    if (r.error) throw new Error('Fel användarnamn eller lösenord');
+  }
+  async function getCurrentUser() {
+    var s = await _supabase.auth.getSession();
+    return s.data.session ? s.data.session.user.id : null;
+  }
+
+  document.getElementById('auth-toggle-btn').addEventListener('click', function () {
+    authMode = authMode === 'login' ? 'register' : 'login';
+    document.getElementById('auth-title').textContent = authMode === 'login' ? 'Logga in' : 'Registrera';
+    document.getElementById('auth-submit-btn').textContent = authMode === 'login' ? 'Logga in' : 'Registrera';
+    this.textContent = authMode === 'login' ? 'Inget konto? Registrera dig' : 'Har redan konto? Logga in';
+  });
+
+  document.getElementById('auth-submit-btn').addEventListener('click', async function () {
+    var username = document.getElementById('auth-username').value.trim();
+    var password = document.getElementById('auth-password').value;
+    var errorEl = document.getElementById('auth-error');
+    errorEl.textContent = '';
+    if (!username || !password) { errorEl.textContent = 'Fyll i båda fälten'; return; }
+    try {
+      if (authMode === 'register') await registerUser(username, password); else await loginUser(username, password);
+      document.getElementById('auth-overlay').style.display = 'none';
+      document.getElementById('chat-toggle-btn').style.display = 'block';
+      await initFriendsAndChat();
+    } catch (err) { errorEl.textContent = err.message; }
+  });
+
+  async function searchUserByUsername(u) {
+    return (await _supabase.from('profiles').select('id, username').eq('username', u.trim()).maybeSingle()).data;
+  }
+  async function sendFriendRequestTo(targetUsername) {
+    var target = await searchUserByUsername(targetUsername);
+    if (!target) throw new Error('Användare finns inte');
+    var me = await getCurrentUser();
+    if (target.id === me) throw new Error('Kan inte lägga till dig själv');
+    var r = await _supabase.from('friendships').insert({ requester_id: me, addressee_id: target.id });
+    if (r.error) throw new Error(r.error.code === '23505' ? 'Förfrågan finns redan' : r.error.message);
+  }
+  async function respondToRequest(friendshipId, accept) {
+    if (accept) await _supabase.from('friendships').update({ status: 'accepted', responded_at: new Date().toISOString() }).eq('id', friendshipId);
+    else await _supabase.from('friendships').delete().eq('id', friendshipId);
+  }
+  async function loadFriendsAndRequests() {
+    var me = await getCurrentUser();
+    var rows = (await _supabase.from('friendships').select('id, requester_id, addressee_id, status').or('requester_id.eq.' + me + ',addressee_id.eq.' + me)).data || [];
+    var otherIds = rows.map(function (r) { return r.requester_id === me ? r.addressee_id : r.requester_id; });
+    var profiles = otherIds.length ? (await _supabase.from('profiles').select('id, username').in('id', otherIds)).data || [] : [];
+    var nameById = {}; profiles.forEach(function (p) { nameById[p.id] = p.username; });
+    friendsList = []; pendingIncoming = [];
+    rows.forEach(function (r) {
+      var otherId = r.requester_id === me ? r.addressee_id : r.requester_id;
+      if (r.status === 'accepted') friendsList.push({ id: otherId, username: nameById[otherId], friendshipId: r.id, unread: false });
+      else if (r.status === 'pending' && r.addressee_id === me) pendingIncoming.push({ fromUserId: otherId, fromUsername: nameById[otherId], friendshipId: r.id });
+    });
+  }
+
+  function toClientMsg(row) { return { id: row.id, fromUserId: row.sender_id, to: row.recipient_id, contentType: row.type, content: row.content }; }
+  async function sendMsgTo(recipientId, content, type) {
+    var me = await getCurrentUser();
+    var r = await _supabase.from('messages').insert({ sender_id: me, recipient_id: recipientId, content: content, type: type || 'text' });
+    if (r.error) throw new Error('Kunde inte skicka (är ni vänner?)');
+  }
+  async function loadHistory(friendId) {
+    var me = await getCurrentUser();
+    var data = (await _supabase.from('messages').select('*')
+      .or('and(sender_id.eq.' + me + ',recipient_id.eq.' + friendId + '),and(sender_id.eq.' + friendId + ',recipient_id.eq.' + me + ')')
+      .order('created_at', { ascending: true }).limit(50)).data || [];
+    await _supabase.from('messages').update({ read_at: new Date().toISOString() }).eq('sender_id', friendId).eq('recipient_id', me).is('read_at', null);
+    messagesByFriend[friendId] = data.map(toClientMsg);
+  }
+
+  function renderFriendList() {
+    var el = document.getElementById('friend-list'); el.innerHTML = '';
+    friendsList.forEach(function (f) {
+      var li = document.createElement('li');
+      if (f.id === activeChatFriendId) li.style.background = '#1C2B36';
+      li.textContent = f.username + (f.unread ? ' •' : '');
+      li.addEventListener('click', function () { openChat(f.id); });
+      el.appendChild(li);
+    });
+  }
+  function renderPendingRequests() {
+    var el = document.getElementById('pending-requests'); el.innerHTML = '';
+    pendingIncoming.forEach(function (r) {
+      var div = document.createElement('div'); div.className = 'pending-row';
+      var label = document.createElement('span'); label.style.flex = '1'; label.textContent = r.fromUsername + ' vill lägga till dig';
+      var accept = document.createElement('button'); accept.textContent = 'OK';
+      accept.style.cssText = 'background:#E8A33D;color:#0F1720;border:none;border-radius:6px;padding:4px 8px;font-size:11px;';
+      accept.addEventListener('click', async function () { await respondToRequest(r.friendshipId, true); await loadFriendsAndRequests(); renderFriendList(); renderPendingRequests(); });
+      var decline = document.createElement('button'); decline.textContent = '✕';
+      decline.style.cssText = 'background:none;border:1px solid #2A3B47;color:#7C93A3;border-radius:6px;padding:4px 8px;font-size:11px;';
+      decline.addEventListener('click', async function () { await respondToRequest(r.friendshipId, false); await loadFriendsAndRequests(); renderPendingRequests(); });
+      div.append(label, accept, decline); el.appendChild(div);
+    });
+  }
+  async function renderChatMessages(friendId) {
+    var el = document.getElementById('chat-messages'); el.innerHTML = '';
+    var me = await getCurrentUser();
+    (messagesByFriend[friendId] || []).forEach(function (msg) {
+      var bubble = document.createElement('div');
+      bubble.className = 'chat-bubble ' + (msg.fromUserId === me ? 'mine' : 'theirs');
+      if (msg.contentType === 'code') {
+        bubble.innerHTML = '📋 Kod delad<br>';
+        var addBtn = document.createElement('button'); addBtn.className = 'chat-add-code-btn'; addBtn.textContent = 'Lägg till som ruta';
+        addBtn.addEventListener('click', function () { window.KanvasAPI.addBox(msg.content, 'Från chatt'); });
+        bubble.appendChild(addBtn);
+      } else { bubble.textContent = msg.content; }
+      el.appendChild(bubble);
+    });
+    el.scrollTop = el.scrollHeight;
+  }
+  async function openChat(friendId) {
+    activeChatFriendId = friendId;
+    renderFriendList();
+    await loadHistory(friendId);
+    await renderChatMessages(friendId);
+  }
+
+  async function handleRealtimeMessage(row) {
+    var msg = toClientMsg(row);
+    var me = await getCurrentUser();
+    var otherId = msg.fromUserId === me ? msg.to : msg.fromUserId;
+    if (!messagesByFriend[otherId]) messagesByFriend[otherId] = [];
+    messagesByFriend[otherId].push(msg);
+    if (activeChatFriendId === otherId) renderChatMessages(otherId);
+    else { var f = friendsList.find(function (x) { return x.id === otherId; }); if (f) { f.unread = true; renderFriendList(); } }
+  }
+  async function handleRealtimeFriendshipChange() { await loadFriendsAndRequests(); renderFriendList(); renderPendingRequests(); }
+
+  async function initFriendsAndChat() {
+    var me = await getCurrentUser();
+    if (!me) return;
+    await loadFriendsAndRequests(); renderFriendList(); renderPendingRequests();
+    _supabase.channel('kanvas-messages').on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages', filter: 'recipient_id=eq.' + me }, function (p) { handleRealtimeMessage(p.new); }).subscribe();
+    _supabase.channel('kanvas-friendships-in').on('postgres_changes', { event: '*', schema: 'public', table: 'friendships', filter: 'addressee_id=eq.' + me }, handleRealtimeFriendshipChange).subscribe();
+    _supabase.channel('kanvas-friendships-out').on('postgres_changes', { event: '*', schema: 'public', table: 'friendships', filter: 'requester_id=eq.' + me }, handleRealtimeFriendshipChange).subscribe();
+  }
+
+  document.getElementById('chat-toggle-btn').addEventListener('click', function () { document.getElementById('chat-panel').style.display = 'flex'; });
+  document.getElementById('chat-panel-close').addEventListener('click', function () { document.getElementById('chat-panel').style.display = 'none'; });
+  document.getElementById('add-friend-btn').addEventListener('click', async function () {
+    var input = document.getElementById('add-friend-input'); var username = input.value.trim(); if (!username) return;
+    try { await sendFriendRequestTo(username); input.value = ''; alert('Förfrågan skickad!'); } catch (err) { alert(err.message); }
+  });
+  document.getElementById('chat-send-btn').addEventListener('click', async function () {
+    var input = document.getElementById('chat-input'); var content = input.value.trim(); if (!content || !activeChatFriendId) return;
+    try {
+      await sendMsgTo(activeChatFriendId, content, 'text');
+      var me = await getCurrentUser();
+      if (!messagesByFriend[activeChatFriendId]) messagesByFriend[activeChatFriendId] = [];
+      messagesByFriend[activeChatFriendId].push({ id: 'tmp' + Date.now(), fromUserId: me, to: activeChatFriendId, contentType: 'text', content: content });
+      await renderChatMessages(activeChatFriendId);
+      input.value = '';
+    } catch (err) { alert(err.message); }
+  });
+  document.getElementById('chat-paste-btn').addEventListener('click', async function () {
+    try { document.getElementById('chat-input').value += await navigator.clipboard.readText(); }
+    catch (err) { alert('Kunde inte läsa urklipp – håll ner i fältet och välj Klistra in.'); }
+  });
+
+  (async function () {
+    var me = await getCurrentUser();
+    if (me) { document.getElementById('chat-toggle-btn').style.display = 'block'; await initFriendsAndChat(); }
+    else { document.getElementById('auth-overlay').style.display = 'flex'; }
+  })();
+})();
+</script>
 </html>
