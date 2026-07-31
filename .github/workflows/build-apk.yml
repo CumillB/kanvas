@@ -89,7 +89,7 @@
   .box.pulse { animation: pulseGlow 0.5s ease-out; }
   .box.fullscreen {
     position: fixed; top: 0; left: 0; right: 0; bottom: 0;
-    width: auto; height: 100dvh; z-index: 1500; border-radius: 0;
+    width: auto; height: 100dvh; max-height: none; z-index: 1500; border-radius: 0;
   }
   .box.fullscreen .box-code { flex: 2 1 0; min-height: 100px; max-height: none; }
   .box.fullscreen .box-canvas.has-content { flex: 3 1 0; height: auto; min-height: 200px; }
