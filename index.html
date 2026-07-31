@@ -273,7 +273,17 @@
   .box.connect-pending { outline: 2px solid #E8A33D; outline-offset: 2px; }
 </style>
 </head>
-<body>
+<body><script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<div id="auth-overlay" style="display:none; position:fixed; inset:0; z-index:1150; background:rgba(15,23,32,0.94); align-items:center; justify-content:center; padding:20px;">
+  <div style="background:#16212B; border:1px solid #2A3B47; border-radius:14px; padding:18px; max-width:360px; width:100%; display:flex; flex-direction:column; gap:12px; font-family:'IBM Plex Mono', monospace;">
+    <div id="auth-title" style="font-family:'Space Grotesk', sans-serif; font-weight:700; color:#DCE6EC; font-size:16px;">Logga in</div>
+    <input id="auth-username" placeholder="Användarnamn" style="width:100%; background:#0F1720; color:#DCE6EC; border:1px solid #2A3B47; border-radius:8px; padding:10px; font-size:14px; font-family:'IBM Plex Mono', monospace;" />
+    <input id="auth-password" type="password" placeholder="Lösenord" style="width:100%; background:#0F1720; color:#DCE6EC; border:1px solid #2A3B47; border-radius:8px; padding:10px; font-size:14px; font-family:'IBM Plex Mono', monospace;" />
+    <div id="auth-error" style="color:#D96C6C; font-size:12px; min-height:14px;"></div>
+    <button id="auth-submit-btn" style="background:#E8A33D; color:#0F1720; border:none; border-radius:8px; padding:11px; font-weight:600; cursor:pointer; font-family:'Space Grotesk', sans-serif; font-size:14px;">Logga in</button>
+    <button id="auth-toggle-btn" style="background:none; border:none; color:#7C93A3; font-size:12px; cursor:pointer; font-family:'IBM Plex Mono', monospace;">Inget konto? Registrera dig</button>
+  </div>
+</div>
   <div id="toolbar">
     <div class="brand">
       <span class="brand-title">KANVAS</span>
