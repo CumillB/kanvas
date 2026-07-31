@@ -1710,15 +1710,18 @@
     var p = await _supabase.from('profiles').insert({ id: r.data.user.id, username: username.trim() });
     if (p.error) throw new Error(p.error.code === '23505' ? 'Användarnamnet är upptaget' : p.error.message);
   }
-  async function loginUser(username, password) {
-    var r = await _supabase.auth.signInWithPassword({ email: usernameToEmail(username), password: password });
-    if (r.error) throw new Error('Fel användarnamn eller lösenord');
-  }
   async function getCurrentUser() {
     var s = await _supabase.auth.getSession();
     return s.data.session ? s.data.session.user.id : null;
   }
-
+async function registerUser(username, password) {
+    var r = await _supabase.auth.signUp({
+      email: usernameToEmail(username),
+      password: password,
+      options: { data: { username: username.trim() } }
+    });
+    if (r.error) throw new Error(r.error.message.indexOf('already') !== -1 || r.error.message.indexOf('duplicate') !== -1 ? 'Användarnamnet är upptaget' : r.error.message);
+  }
   document.getElementById('auth-toggle-btn').addEventListener('click', function () {
     authMode = authMode === 'login' ? 'register' : 'login';
     document.getElementById('auth-title').textContent = authMode === 'login' ? 'Logga in' : 'Registrera';
