@@ -89,7 +89,7 @@
   .box.pulse { animation: pulseGlow 0.5s ease-out; }
   .box.fullscreen {
     position: fixed; top: 0; left: 0; right: 0; bottom: 0;
-    width: auto; height: 100dvh; z-index: 1500; border-radius: 0;
+    width: auto; height: 100dvh; max-height: none; z-index: 1500; border-radius: 0;
   }
   .box.fullscreen .box-code { flex: 2 1 0; min-height: 100px; max-height: none; }
   .box.fullscreen .box-canvas.has-content { flex: 3 1 0; height: auto; min-height: 200px; }
@@ -108,7 +108,7 @@
   .box-header {
     display: flex; align-items: center; justify-content: space-between;
     padding: 9px 10px; background: #1C2B36; border-bottom: 1px solid #2A3B47;
-    cursor: grab; touch-action: none; user-select: none;
+    cursor: grab; touch-action: none; user-select: none; flex-shrink: 0;
   }
   .box-header-left { display: flex; align-items: center; gap: 8px; min-width: 0; }
   .box-name {
@@ -134,17 +134,17 @@
   .run-btn {
     background: transparent; color: #E8A33D; border: none;
     border-top: 1px solid #2A3B47; padding: 10px; cursor: pointer;
-    text-align: left; font-weight: 600; font-size: 13px;
+    text-align: left; font-weight: 600; font-size: 13px; flex-shrink: 0;
   }
   .run-btn:active { background: rgba(232,163,61,0.12); }
   .box-canvas {
     display: none; background: #000; position: relative;
   }
-  .box-canvas.has-content { display: block; height: 220px; overflow: hidden; border-top: 1px solid #2A3B47; }
+  .box-canvas.has-content { display: block; height: 220px; overflow: hidden; border-top: 1px solid #2A3B47; flex-shrink: 0; }
   .box-canvas canvas { display: block; width: 100% !important; height: 100% !important; touch-action: none; }
   .box-output {
     font-size: 12px; padding: 9px 10px; border-top: 1px solid #2A3B47;
-    max-height: 140px; overflow-y: auto; min-height: 18px;
+    max-height: 140px; overflow-y: auto; min-height: 18px; flex-shrink: 0;
   }
   .out-log { color: #DCE6EC; white-space: pre-wrap; word-break: break-word; margin-bottom: 3px; }
   .out-result { color: #8FBC94; white-space: pre-wrap; word-break: break-word; }
@@ -259,11 +259,11 @@
   }
   .box-undo-link.show { opacity: 1; }
 
-  .box-code-wrap { display: flex; background: #0F1720; }
+  .box-code-wrap { display: flex; background: #0F1720; flex: 1; min-height: 90px; }
   .box-linenos {
     flex-shrink: 0; padding: 10px 4px 10px 10px; text-align: right;
     color: #45596A; font-family: 'IBM Plex Mono', monospace; font-size: 13px; line-height: 1.5;
-    overflow: hidden; user-select: none; white-space: pre;
+    overflow: hidden; user-select: none; white-space: pre; max-height: 40vh;
   }
 
   #connections-svg { position: absolute; top: 0; left: 0; pointer-events: none; }
