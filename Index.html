@@ -23,292 +23,328 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
 <style>
-  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
-  html, body {
-    margin: 0; padding: 0; height: 100%; overflow: hidden;
-    background: #0F1720; font-family: 'IBM Plex Mono', monospace;
-  }
-  button { font: inherit; }
-  #toolbar {
-    position: fixed; top: 0; left: 0; right: 0; height: 56px;
-    display: flex; align-items: center; justify-content: space-between;
-    padding: 0 14px; background: rgba(15,23,32,0.9);
-    -webkit-backdrop-filter: blur(10px); backdrop-filter: blur(10px);
-    border-bottom: 1px solid #24333E; z-index: 1000;
-  }
-  .brand { display: flex; align-items: baseline; gap: 8px; }
-  .brand-title { font-family: 'Space Grotesk', sans-serif; font-weight: 700; font-size: 19px; letter-spacing: 0.5px; color: #DCE6EC; }
-  .toolbar-right { display: flex; align-items: center; gap: 10px; }
-  .status { font-size: 11px; color: #5D7484; min-width: 56px; text-align: right; }
-  .add-btn {
-    font-family: 'Space Grotesk', sans-serif; font-weight: 600; font-size: 14px;
-    background: #E8A33D; color: #0F1720; border: none;
-    padding: 10px 16px; border-radius: 9px; cursor: pointer;
-  }
-  .add-btn:active { background: #C6842A; }
-  #canvas-scroll {
-    position: absolute; top: 56px; left: 0; right: 0; bottom: 0;
-    overflow: auto; -webkit-overflow-scrolling: touch;
-    touch-action: none;
-  }
-  #canvas-sizer { position: relative; width: 8000px; height: 8000px; }
-  #canvas {
-    position: absolute; top: 0; left: 0; width: 8000px; height: 8000px;
-    transform-origin: 0 0;
-    background-color: #0F1720;
-    background-image:
-      linear-gradient(rgba(255,255,255,0.07) 1px, transparent 1px),
-      linear-gradient(90deg, rgba(255,255,255,0.07) 1px, transparent 1px),
-      linear-gradient(rgba(255,255,255,0.03) 1px, transparent 1px),
-      linear-gradient(90deg, rgba(255,255,255,0.03) 1px, transparent 1px);
-    background-size: 200px 200px, 200px 200px, 40px 40px, 40px 40px;
-  }
-  #zoom-controls {
-    position: fixed; right: 16px; top: 66px; z-index: 900;
-    display: flex; flex-direction: column; align-items: stretch;
-    background: rgba(28,43,54,0.92); border: 1px solid #2A3B47; border-radius: 12px;
-    overflow: hidden; -webkit-backdrop-filter: blur(8px); backdrop-filter: blur(8px);
-    box-shadow: 0 4px 16px rgba(0,0,0,0.35);
-  }
-  #zoom-controls button {
-    width: 44px; height: 44px; background: none; border: none; color: #DCE6EC;
-    font-size: 20px; font-family: 'Space Grotesk', sans-serif; cursor: pointer;
-  }
-  #zoom-controls button:active { background: rgba(232,163,61,0.15); color: #E8A33D; }
-  #zoomLabel {
-    font-size: 10px; color: #7C93A3; padding: 4px 0; text-align: center;
-    border-top: 1px solid #2A3B47; border-bottom: 1px solid #2A3B47; cursor: pointer;
-  }
-  .box {
-    position: absolute; width: min(300px, 86vw);
-    background: #16212B; border: 1px solid #2A3B47; border-radius: 10px;
-    box-shadow: 0 4px 16px rgba(0,0,0,0.35);
-    display: flex; flex-direction: column; overflow: hidden;
-  }
-  .box.dragging { border-color: #E8A33D; box-shadow: 0 8px 28px rgba(0,0,0,0.5); }
-  .box.pulse { animation: pulseGlow 0.5s ease-out; }
-  .box.fullscreen {
-    position: fixed; top: 0; left: 0; right: 0; bottom: 0;
-    width: auto; height: 100dvh; z-index: 1500; border-radius: 0;
-  }
-  .box.fullscreen .box-code { flex: 2 1 0; min-height: 100px; }
-  .box.fullscreen .box-canvas.has-content { flex: 3 1 0; height: auto; min-height: 200px; }
-  .box.fullscreen .box-output { flex: 0 0 auto; max-height: 22vh; }
-  .fullscreen-btn {
-    background: none; border: none; color: #7C93A3; width: 28px; height: 28px;
-    display: flex; align-items: center; justify-content: center; border-radius: 6px;
-    cursor: pointer; touch-action: manipulation; flex-shrink: 0;
-  }
-  .fullscreen-btn:active { color: #E8A33D; background: rgba(232,163,61,0.12); }
-  @keyframes pulseGlow {
-    0% { box-shadow: 0 0 0 0 rgba(232,163,61,0.55), 0 4px 16px rgba(0,0,0,0.35); }
-    100% { box-shadow: 0 0 0 14px rgba(232,163,61,0), 0 4px 16px rgba(0,0,0,0.35); }
-  }
-  @media (prefers-reduced-motion: reduce) { .box.pulse { animation: none; } }
-  .box-header {
-    display: flex; align-items: center; justify-content: space-between;
-    padding: 9px 10px; background: #1C2B36; border-bottom: 1px solid #2A3B47;
-    cursor: grab; touch-action: none; user-select: none;
-  }
-  .box-header-left { display: flex; align-items: center; gap: 8px; min-width: 0; }
-  .box-name {
-    font-size: 12px; color: #DCE6EC; letter-spacing: 0.3px;
-    white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 150px;
-    border-bottom: 1px dotted #45596A; padding-bottom: 1px; touch-action: manipulation;
-  }
-  .box-saved {
-    font-size: 11px; color: #8FBC94; opacity: 0; transition: opacity 0.25s ease; flex-shrink: 0;
-  }
-  .box-saved.show { opacity: 1; }
-  .delete-btn {
-    background: none; border: none; color: #7C93A3; font-size: 19px; line-height: 1;
-    cursor: pointer; padding: 2px 6px; touch-action: manipulation;
-  }
-  .delete-btn:active { color: #D96C6C; }
-  .box-code {
-    font-family: 'IBM Plex Mono', monospace; font-size: 13px; color: #DCE6EC;
-    background: #0F1720; border: none; padding: 10px; min-height: 90px;
-    resize: vertical; outline: none; line-height: 1.5; width: 100%; display: block;
-  }
-  .run-btn {
-    background: transparent; color: #E8A33D; border: none;
-    border-top: 1px solid #2A3B47; padding: 10px; cursor: pointer;
-    text-align: left; font-weight: 600; font-size: 13px;
-  }
-  .run-btn:active { background: rgba(232,163,61,0.12); }
-  .box-canvas {
-    display: none; background: #000; position: relative;
-  }
-  .box-canvas.has-content { display: block; height: 220px; overflow: hidden; border-top: 1px solid #2A3B47; }
-  .box-canvas canvas { display: block; width: 100% !important; height: 100% !important; touch-action: none; }
-  .box-output {
-    font-size: 12px; padding: 9px 10px; border-top: 1px solid #2A3B47;
-    max-height: 140px; overflow-y: auto; min-height: 18px;
-  }
-  .out-log { color: #DCE6EC; white-space: pre-wrap; word-break: break-word; margin-bottom: 3px; }
-  .out-result { color: #8FBC94; white-space: pre-wrap; word-break: break-word; }
-  .out-error { color: #D96C6C; white-space: pre-wrap; word-break: break-word; }
-  .out-empty { color: #45596A; font-style: italic; }
-  .lock-btn {
-    background: none; border: none; color: #7C93A3; width: 32px; height: 32px;
-    display: flex; align-items: center; justify-content: center; border-radius: 8px; cursor: pointer;
-  }
-  .lock-btn:active { color: #E8A33D; background: rgba(232,163,61,0.12); }
-  #settings-menu {
-    display: none; position: fixed; z-index: 1100; min-width: 190px;
-    background: #16212B; border: 1px solid #2A3B47; border-radius: 10px;
-    box-shadow: 0 4px 18px rgba(0,0,0,0.4); overflow: hidden;
-  }
-  #settings-menu button {
-    display: block; width: 100%; text-align: left; background: none; border: none;
-    color: #DCE6EC; padding: 12px 14px; font-size: 13px; font-family: 'IBM Plex Mono', monospace; cursor: pointer;
-  }
-  #settings-menu button:active { background: rgba(232,163,61,0.1); }
-  #settings-menu button + button { border-top: 1px solid #2A3B47; }
-  #transfer-overlay {
-    display: none; position: fixed; inset: 0; z-index: 1150;
-    background: rgba(15,23,32,0.94); align-items: center; justify-content: center; padding: 20px;
-  }
-  #transfer-panel {
-    background: #16212B; border: 1px solid #2A3B47; border-radius: 14px; padding: 18px;
-    max-width: 420px; width: 100%; max-height: 82vh; overflow-y: auto;
-    display: flex; flex-direction: column; gap: 10px; font-family: 'IBM Plex Mono', monospace;
-  }
-  #transfer-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px; }
-  #transfer-title { font-family: 'Space Grotesk', sans-serif; font-weight: 700; color: #DCE6EC; font-size: 15px; }
-  #transfer-close { background: none; border: none; color: #7C93A3; font-size: 20px; cursor: pointer; line-height: 1; }
-  .transfer-label { color: #7C93A3; font-size: 12px; }
-  .transfer-row { display: flex; gap: 8px; }
-  .transfer-divider { border-top: 1px solid #2A3B47; margin: 6px 0; }
-  #transfer-export-area, #transfer-import-area {
-    width: 100%; height: 84px; background: #0F1720; color: #DCE6EC; border: 1px solid #2A3B47;
-    border-radius: 8px; padding: 8px; font-size: 11px; font-family: 'IBM Plex Mono', monospace; resize: none;
-  }
-  #transfer-export-btn, #transfer-import-btn {
-    background: #E8A33D; color: #0F1720; border: none; border-radius: 8px; padding: 9px 14px;
-    font-weight: 600; cursor: pointer; font-family: 'Space Grotesk', sans-serif; font-size: 13px;
-  }
-  #transfer-copy-btn {
-    background: #1C2B36; color: #DCE6EC; border: 1px solid #2A3B47; border-radius: 8px; padding: 9px 14px;
-    cursor: pointer; font-family: 'Space Grotesk', sans-serif; font-size: 13px;
-  }
-  #transfer-import-btn { width: 100%; }
-  #transfer-status { font-size: 12px; min-height: 16px; }
-  #lock-overlay {
-    display: flex; position: fixed; inset: 0; z-index: 2000;
-    background: #0F1720; flex-direction: column; align-items: center; justify-content: center;
-    gap: 22px; padding: 24px; font-family: 'IBM Plex Mono', monospace;
-  }
-  #lock-title { font-family: 'Space Grotesk', sans-serif; font-size: 17px; color: #DCE6EC; font-weight: 600; min-height: 22px; }
-  #lock-dots { display: flex; gap: 16px; }
-  .lock-dot {
-    width: 14px; height: 14px; border-radius: 50%; border: 1.5px solid #7C93A3; background: transparent;
-    transition: background 0.15s ease, border-color 0.15s ease;
-  }
-  .lock-dot.filled { background: #E8A33D; border-color: #E8A33D; }
-  #lock-dots.shake { animation: lockShake 0.4s ease; }
-  @keyframes lockShake {
-    20%, 60% { transform: translateX(-8px); }
-    40%, 80% { transform: translateX(8px); }
-  }
-  @media (prefers-reduced-motion: reduce) { #lock-dots.shake { animation: none; } }
-  #lock-error { color: #D96C6C; font-size: 12px; min-height: 16px; visibility: hidden; }
-  #lock-keypad { display: grid; grid-template-columns: repeat(3, 72px); gap: 18px; }
-  #lock-keypad button {
-    width: 72px; height: 72px; border-radius: 50%; background: rgba(255,255,255,0.06);
-    border: 1px solid #2A3B47; color: #DCE6EC; font-size: 26px; font-family: 'Space Grotesk', sans-serif;
-    font-weight: 500; cursor: pointer; display: flex; align-items: center; justify-content: center;
-  }
-  #lock-keypad button:active { background: rgba(255,255,255,0.16); }
-  #undo-toast {
-    display: none; position: fixed; left: 50%; bottom: 92px; transform: translateX(-50%);
-    background: #1C2B36; border: 1px solid #2A3B47; border-radius: 10px;
-    padding: 10px 8px 10px 14px; align-items: center; gap: 14px;
-    box-shadow: 0 4px 16px rgba(0,0,0,0.4); z-index: 1300; font-family: 'IBM Plex Mono', monospace;
-    font-size: 12px; color: #DCE6EC; max-width: min(320px, 84vw);
-  }
-  #undo-toast-msg { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  #undo-toast-btn {
-    background: none; border: none; color: #E8A33D; font-weight: 600; cursor: pointer;
-    font-family: 'Space Grotesk', sans-serif; font-size: 12px; white-space: nowrap; padding: 6px 8px;
-  }
-  #lock-cancel {
-    display: none; background: none; border: none; color: #7C93A3; font-size: 13px;
-    margin-top: 4px; cursor: pointer; font-family: 'IBM Plex Mono', monospace;
-  }
-  @media (orientation: landscape) and (max-height: 500px) {
-    #lock-overlay { gap: 10px; padding: 10px; }
-    #lock-dots { gap: 12px; }
-    .lock-dot { width: 11px; height: 11px; }
-    #lock-keypad { grid-template-columns: repeat(3, 50px); gap: 8px; }
-    #lock-keypad button { width: 50px; height: 50px; font-size: 19px; }
-  }
-  textarea:focus, button:focus-visible { outline: 2px solid #E8A33D; outline-offset: 1px; }
+* { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+
+html, body {
+  margin: 0; padding: 0; height: 100%; overflow: hidden;
+  background: #0F1720; font-family: 'IBM Plex Mono', monospace;
+}
+
+button { font: inherit; }
+
+#toolbar {
+  position: fixed; top: 0; left: 0; right: 0;
+  height: calc(56px + env(safe-area-inset-top));
+  display: flex; align-items: center; justify-content: space-between;
+  padding: env(safe-area-inset-top) 14px 0 14px;
+  background: rgba(15,23,32,0.9);
+  -webkit-backdrop-filter: blur(10px); backdrop-filter: blur(10px);
+  border-bottom: 1px solid #24333E; z-index: 1000;
+}
+
+.brand { display: flex; align-items: baseline; gap: 8px; }
+.brand-title { font-family: 'Space Grotesk', sans-serif; font-weight: 700; font-size: 19px; letter-spacing: 0.5px; color: #DCE6EC; }
+.toolbar-right { display: flex; align-items: center; gap: 10px; }
+.status { font-size: 11px; color: #5D7484; min-width: 56px; text-align: right; }
+
+.add-btn {
+  font-family: 'Space Grotesk', sans-serif; font-weight: 600; font-size: 14px;
+  background: #E8A33D; color: #0F1720; border: none;
+  padding: 10px 16px; border-radius: 9px; cursor: pointer;
+}
+.add-btn:active { background: #C6842A; }
+
+#canvas-scroll {
+  position: absolute; top: calc(56px + env(safe-area-inset-top)); left: 0; right: 0; bottom: 0;
+  overflow: auto; -webkit-overflow-scrolling: touch;
+}
+#canvas-sizer { position: relative; width: 4000px; height: 4000px; }
+#canvas {
+  position: absolute; top: 0; left: 0; width: 4000px; height: 4000px;
+  transform-origin: 0 0;
+  background-color: #0F1720;
+  background-image:
+    linear-gradient(rgba(255,255,255,0.07) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255,255,255,0.07) 1px, transparent 1px),
+    linear-gradient(rgba(255,255,255,0.03) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255,255,255,0.03) 1px, transparent 1px);
+  background-size: 200px 200px, 200px 200px, 40px 40px, 40px 40px;
+}
+
+#zoom-controls {
+  position: fixed; right: 16px; top: calc(66px + env(safe-area-inset-top)); z-index: 900;
+  display: flex; flex-direction: column; align-items: stretch;
+  background: rgba(28,43,54,0.92); border: 1px solid #2A3B47; border-radius: 12px;
+  overflow: hidden; -webkit-backdrop-filter: blur(8px); backdrop-filter: blur(8px);
+  box-shadow: 0 4px 16px rgba(0,0,0,0.35);
+}
+#zoom-controls button {
+  width: 44px; height: 44px; background: none; border: none; color: #DCE6EC;
+  font-size: 20px; font-family: 'Space Grotesk', sans-serif; cursor: pointer;
+}
+#zoom-controls button:active { background: rgba(232,163,61,0.15); color: #E8A33D; }
+#zoomLabel {
+  font-size: 10px; color: #7C93A3; padding: 4px 0; text-align: center;
+  border-top: 1px solid #2A3B47; border-bottom: 1px solid #2A3B47; cursor: pointer;
+}
+
+.box {
+  position: absolute; width: min(300px, 86vw);
+  background: #16212B; border: 1px solid #2A3B47; border-radius: 10px;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.35);
+  display: flex; flex-direction: column; overflow: hidden;
+}
+.box.dragging { border-color: #E8A33D; box-shadow: 0 8px 28px rgba(0,0,0,0.5); }
+.box.pulse { animation: pulseGlow 0.5s ease-out; }
+.box.fullscreen {
+  position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+  width: auto; height: 100dvh; z-index: 1500; border-radius: 0;
+  padding: env(safe-area-inset-top) env(safe-area-inset-right)
+           env(safe-area-inset-bottom) env(safe-area-inset-left);
+}
+.box.fullscreen .box-code { flex: 2 1 0; min-height: 100px; }
+.box.fullscreen .box-canvas.has-content { flex: 3 1 0; height: auto; min-height: 200px; }
+.box.fullscreen .box-output { flex: 0 0 auto; max-height: 22vh; }
+
+.fullscreen-btn {
+  background: none; border: none; color: #7C93A3; width: 28px; height: 28px;
+  display: flex; align-items: center; justify-content: center; border-radius: 6px;
+  cursor: pointer; touch-action: manipulation; flex-shrink: 0;
+}
+.fullscreen-btn:active { color: #E8A33D; background: rgba(232,163,61,0.12); }
+
+@keyframes pulseGlow {
+  0% { box-shadow: 0 0 0 0 rgba(232,163,61,0.55), 0 4px 16px rgba(0,0,0,0.35); }
+  100% { box-shadow: 0 0 0 14px rgba(232,163,61,0), 0 4px 16px rgba(0,0,0,0.35); }
+}
+@media (prefers-reduced-motion: reduce) { .box.pulse { animation: none; } }
+
+.box-header {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 9px 10px; background: #1C2B36; border-bottom: 1px solid #2A3B47;
+  cursor: grab; touch-action: none; user-select: none;
+}
+.box-header-left { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.box-name {
+  font-size: 12px; color: #DCE6EC; letter-spacing: 0.3px;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 150px;
+  border-bottom: 1px dotted #45596A; padding-bottom: 1px; touch-action: manipulation;
+}
+.box-saved { font-size: 11px; color: #8FBC94; opacity: 0; transition: opacity 0.25s ease; flex-shrink: 0; }
+.box-saved.show { opacity: 1; }
+.delete-btn {
+  background: none; border: none; color: #7C93A3; font-size: 19px; line-height: 1;
+  cursor: pointer; padding: 2px 6px; touch-action: manipulation;
+}
+.delete-btn:active { color: #D96C6C; }
+
+.box-code {
+  font-family: 'IBM Plex Mono', monospace; font-size: 13px; color: #DCE6EC;
+  background: #0F1720; border: none; padding: 10px; min-height: 90px;
+  resize: vertical; outline: none; line-height: 1.5; width: 100%; display: block;
+}
+.run-btn {
+  background: transparent; color: #E8A33D; border: none;
+  border-top: 1px solid #2A3B47; padding: 10px; cursor: pointer;
+  text-align: left; font-weight: 600; font-size: 13px;
+}
+.run-btn:active { background: rgba(232,163,61,0.12); }
+
+.box-canvas { display: none; background: #000; position: relative; }
+.box-canvas.has-content { display: block; height: 220px; overflow: hidden; border-top: 1px solid #2A3B47; }
+.box-canvas canvas { display: block; width: 100% !important; height: 100% !important; touch-action: none; }
+
+.box-output {
+  font-size: 12px; padding: 9px 10px; border-top: 1px solid #2A3B47;
+  max-height: 140px; overflow-y: auto; min-height: 18px;
+}
+.out-log { color: #DCE6EC; white-space: pre-wrap; word-break: break-word; margin-bottom: 3px; }
+.out-result { color: #8FBC94; white-space: pre-wrap; word-break: break-word; }
+.out-error { color: #D96C6C; white-space: pre-wrap; word-break: break-word; }
+.out-empty { color: #45596A; font-style: italic; }
+
+.lock-btn {
+  background: none; border: none; color: #7C93A3; width: 32px; height: 32px;
+  display: flex; align-items: center; justify-content: center; border-radius: 8px; cursor: pointer;
+}
+.lock-btn:active { color: #E8A33D; background: rgba(232,163,61,0.12); }
+
+#settings-menu {
+  display: none; position: fixed; z-index: 1100; min-width: 190px;
+  background: #16212B; border: 1px solid #2A3B47; border-radius: 10px;
+  box-shadow: 0 4px 18px rgba(0,0,0,0.4); overflow: hidden;
+}
+#settings-menu button {
+  display: block; width: 100%; text-align: left; background: none; border: none;
+  color: #DCE6EC; padding: 12px 14px; font-size: 13px; font-family: 'IBM Plex Mono', monospace; cursor: pointer;
+}
+#settings-menu button:active { background: rgba(232,163,61,0.1); }
+#settings-menu button + button { border-top: 1px solid #2A3B47; }
+
+#transfer-overlay {
+  display: none; position: fixed; inset: 0; z-index: 1150;
+  background: rgba(15,23,32,0.94); align-items: center; justify-content: center; padding: 20px;
+}
+#transfer-panel {
+  background: #16212B; border: 1px solid #2A3B47; border-radius: 14px; padding: 18px;
+  max-width: 420px; width: 100%; max-height: 82vh; overflow-y: auto;
+  display: flex; flex-direction: column; gap: 10px; font-family: 'IBM Plex Mono', monospace;
+}
+#transfer-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px; }
+#transfer-title { font-family: 'Space Grotesk', sans-serif; font-weight: 700; color: #DCE6EC; font-size: 15px; }
+#transfer-close { background: none; border: none; color: #7C93A3; font-size: 20px; cursor: pointer; line-height: 1; }
+.transfer-label { color: #7C93A3; font-size: 12px; }
+.transfer-row { display: flex; gap: 8px; }
+.transfer-divider { border-top: 1px solid #2A3B47; margin: 6px 0; }
+#transfer-export-area, #transfer-import-area {
+  width: 100%; height: 84px; background: #0F1720; color: #DCE6EC; border: 1px solid #2A3B47;
+  border-radius: 8px; padding: 8px; font-size: 11px; font-family: 'IBM Plex Mono', monospace; resize: none;
+}
+#transfer-export-btn, #transfer-import-btn {
+  background: #E8A33D; color: #0F1720; border: none; border-radius: 8px; padding: 9px 14px;
+  font-weight: 600; cursor: pointer; font-family: 'Space Grotesk', sans-serif; font-size: 13px;
+}
+#transfer-copy-btn {
+  background: #1C2B36; color: #DCE6EC; border: 1px solid #2A3B47; border-radius: 8px; padding: 9px 14px;
+  cursor: pointer; font-family: 'Space Grotesk', sans-serif; font-size: 13px;
+}
+#transfer-import-btn { width: 100%; }
+#transfer-status { font-size: 12px; min-height: 16px; }
+
+#lock-overlay {
+  display: flex; position: fixed; inset: 0; z-index: 2000;
+  background: #0F1720; flex-direction: column; align-items: center; justify-content: center;
+  gap: 22px; padding: 24px; font-family: 'IBM Plex Mono', monospace;
+}
+#lock-title { font-family: 'Space Grotesk', sans-serif; font-size: 17px; color: #DCE6EC; font-weight: 600; min-height: 22px; }
+#lock-dots { display: flex; gap: 16px; }
+.lock-dot {
+  width: 14px; height: 14px; border-radius: 50%; border: 1.5px solid #7C93A3; background: transparent;
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+.lock-dot.filled { background: #E8A33D; border-color: #E8A33D; }
+#lock-dots.shake { animation: lockShake 0.4s ease; }
+@keyframes lockShake {
+  20%, 60% { transform: translateX(-8px); }
+  40%, 80% { transform: translateX(8px); }
+}
+@media (prefers-reduced-motion: reduce) { #lock-dots.shake { animation: none; } }
+#lock-error { color: #D96C6C; font-size: 12px; min-height: 16px; visibility: hidden; }
+#lock-keypad { display: grid; grid-template-columns: repeat(3, 72px); gap: 18px; }
+#lock-keypad button {
+  width: 72px; height: 72px; border-radius: 50%; background: rgba(255,255,255,0.06);
+  border: 1px solid #2A3B47; color: #DCE6EC; font-size: 26px; font-family: 'Space Grotesk', sans-serif;
+  font-weight: 500; cursor: pointer; display: flex; align-items: center; justify-content: center;
+}
+#lock-keypad button:active { background: rgba(255,255,255,0.16); }
+
+#undo-toast {
+  display: none; position: fixed; left: 50%; bottom: 92px; transform: translateX(-50%);
+  background: #1C2B36; border: 1px solid #2A3B47; border-radius: 10px;
+  padding: 10px 8px 10px 14px; align-items: center; gap: 14px;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.4); z-index: 1300; font-family: 'IBM Plex Mono', monospace;
+  font-size: 12px; color: #DCE6EC; max-width: min(320px, 84vw);
+}
+#undo-toast-msg { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+#undo-toast-btn {
+  background: none; border: none; color: #E8A33D; font-weight: 600; cursor: pointer;
+  font-family: 'Space Grotesk', sans-serif; font-size: 12px; white-space: nowrap; padding: 6px 8px;
+}
+#lock-cancel {
+  display: none; background: none; border: none; color: #7C93A3; font-size: 13px;
+  margin-top: 4px; cursor: pointer; font-family: 'IBM Plex Mono', monospace;
+}
+
+@media (orientation: landscape) and (max-height: 500px) {
+  #lock-overlay { gap: 10px; padding: 10px; }
+  #lock-dots { gap: 12px; }
+  .lock-dot { width: 11px; height: 11px; }
+  #lock-keypad { grid-template-columns: repeat(3, 50px); gap: 8px; }
+  #lock-keypad button { width: 50px; height: 50px; font-size: 19px; }
+}
+
+textarea:focus, button:focus-visible { outline: 2px solid #E8A33D; outline-offset: 1px; }
+
+/* iPad/surfplatta (>=768px bred viewport): bredare rutor och mer luft.
+   Telefon (under 768px) är helt opåverkad av detta block. */
+@media (min-width: 768px) {
+  .box { width: min(440px, 45vw); }
+  .box-name { max-width: 220px; }
+  .box-canvas.has-content { height: 300px; }
+  .box-code { min-height: 110px; }
+}
 </style>
 </head>
 <body>
-  <div id="toolbar">
-    <div class="brand">
-      <span class="brand-title">KANVAS</span>
-      <button class="lock-btn" id="settingsBtn" aria-label="Inställningar"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg></button>
+
+<div id="toolbar">
+  <div class="brand">
+    <span class="brand-title">KANVAS</span>
+    <button class="lock-btn" id="settingsBtn" aria-label="Inställningar"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg></button>
+  </div>
+  <div class="toolbar-right">
+    <span class="status" id="status"></span>
+    <button class="add-btn" id="addBtn">+ Ny ruta</button>
+  </div>
+</div>
+
+<div id="settings-menu">
+  <button id="menuChangeCode">Byt kod</button>
+  <button id="menuFind">Hitta ruta</button>
+  <button id="menuTransfer">Flytta till annan enhet</button>
+  <button id="menuDebug">Felsökningskonsol: Av</button>
+</div>
+
+<div id="canvas-scroll">
+  <div id="canvas-sizer">
+    <div id="canvas"></div>
+  </div>
+</div>
+
+<div id="zoom-controls">
+  <button id="zoomInBtn" aria-label="Zooma in">+</button>
+  <span id="zoomLabel" title="Tryck för 100%">100%</span>
+  <button id="zoomOutBtn" aria-label="Zooma ut">−</button>
+</div>
+
+<div id="lock-overlay">
+  <div id="lock-title"></div>
+  <div id="lock-dots"></div>
+  <div id="lock-error"></div>
+  <div id="lock-keypad"></div>
+  <button id="lock-cancel">Avbryt</button>
+</div>
+
+<div id="undo-toast">
+  <span id="undo-toast-msg"></span>
+  <button id="undo-toast-btn">Ångra</button>
+</div>
+
+<div id="transfer-overlay">
+  <div id="transfer-panel">
+    <div id="transfer-header">
+      <span id="transfer-title">Flytta till annan enhet</span>
+      <button id="transfer-close" aria-label="Stäng">&times;</button>
     </div>
-    <div class="toolbar-right">
-      <span class="status" id="status"></span>
-      <button class="add-btn" id="addBtn">+ Ny ruta</button>
+    <div class="transfer-label">Exportera (från den här enheten)</div>
+    <div class="transfer-row">
+      <button id="transfer-export-btn">Skapa kod</button>
+      <button id="transfer-copy-btn">Kopiera</button>
     </div>
+    <textarea id="transfer-export-area" readonly placeholder='Tryck "Skapa kod" ovan...'></textarea>
+    <div class="transfer-divider"></div>
+    <div class="transfer-label">Importera (på den nya enheten)</div>
+    <textarea id="transfer-import-area" placeholder="Klistra in koden här..."></textarea>
+    <button id="transfer-import-btn">Importera och ladda om</button>
+    <div id="transfer-status"></div>
   </div>
-  <div id="settings-menu">
-    <button id="menuChangeCode">Byt kod</button>
-    <button id="menuFind">Hitta ruta</button>
-    <button id="menuTransfer">Flytta till annan enhet</button>
-    <button id="menuDebug">Felsökningskonsol: Av</button>
-  </div>
-  <div id="canvas-scroll">
-    <div id="canvas-sizer">
-      <div id="canvas"></div>
-    </div>
-  </div>
-  <div id="zoom-controls">
-    <button id="zoomInBtn" aria-label="Zooma in">+</button>
-    <span id="zoomLabel" title="Tryck för 100%">100%</span>
-    <button id="zoomOutBtn" aria-label="Zooma ut">−</button>
-  </div>
-  <div id="lock-overlay">
-    <div id="lock-title"></div>
-    <div id="lock-dots"></div>
-    <div id="lock-error"></div>
-    <div id="lock-keypad"></div>
-    <button id="lock-cancel">Avbryt</button>
-  </div>
-  <div id="undo-toast">
-    <span id="undo-toast-msg"></span>
-    <button id="undo-toast-btn">Ångra</button>
-  </div>
-  <div id="transfer-overlay">
-    <div id="transfer-panel">
-      <div id="transfer-header">
-        <span id="transfer-title">Flytta till annan enhet</span>
-        <button id="transfer-close" aria-label="Stäng">&times;</button>
-      </div>
-      <div class="transfer-label">Exportera (från den här enheten)</div>
-      <div class="transfer-row">
-        <button id="transfer-export-btn">Skapa kod</button>
-        <button id="transfer-copy-btn">Kopiera</button>
-      </div>
-      <textarea id="transfer-export-area" readonly placeholder='Tryck "Skapa kod" ovan...'></textarea>
-      <div class="transfer-divider"></div>
-      <div class="transfer-label">Importera (på den nya enheten)</div>
-      <textarea id="transfer-import-area" placeholder="Klistra in koden här..."></textarea>
-      <button id="transfer-import-btn">Importera och ladda om</button>
-      <div id="transfer-status"></div>
-    </div>
-  </div>
+</div>
 
 <script>
 (function () {
   "use strict";
 
-  var CANVAS_SIZE = 8000;
+  var CANVAS_SIZE = 4000;
   var BOX_HALF_WIDTH = 150;
   var fullscreenBoxId = null;
   var LOCK_DIGITS = 6;
@@ -324,6 +360,7 @@
   var zoom = 1;
   var MIN_ZOOM = 0.15;
   var MAX_ZOOM = 2;
+
   var canvasEl = document.getElementById('canvas');
   var sizerEl = document.getElementById('canvas-sizer');
   var scrollEl = document.getElementById('canvas-scroll');
@@ -399,15 +436,12 @@
     }
     var canvasX = (scrollEl.scrollLeft + centerX) / zoom;
     var canvasY = (scrollEl.scrollTop + centerY) / zoom;
-
     zoom = newZoom;
     canvasEl.style.transform = 'scale(' + zoom + ')';
     sizerEl.style.width = (CANVAS_SIZE * zoom) + 'px';
     sizerEl.style.height = (CANVAS_SIZE * zoom) + 'px';
-
     scrollEl.scrollLeft = canvasX * zoom - centerX;
     scrollEl.scrollTop = canvasY * zoom - centerY;
-
     var label = document.getElementById('zoomLabel');
     if (label) label.textContent = Math.round(zoom * 100) + '%';
   }
@@ -418,7 +452,6 @@
   var pinchStartDist = null;
   var pinchStartZoom = null;
   var pinchStartMid = null;
-  var panStartX = null, panStartY = null, panStartScrollLeft = null, panStartScrollTop = null;
 
   function pointDist(a, b) {
     return Math.sqrt((a.x - b.x) * (a.x - b.x) + (a.y - b.y) * (a.y - b.y));
@@ -431,17 +464,14 @@
     if (e.target.closest('.box')) return; // let the box (textarea, 3D view, ...) own its own gestures
     activePointers[e.pointerId] = { x: e.clientX, y: e.clientY };
     var keys = Object.keys(activePointers);
-    if (keys.length === 1) {
-      panStartX = e.clientX; panStartY = e.clientY;
-      panStartScrollLeft = scrollEl.scrollLeft; panStartScrollTop = scrollEl.scrollTop;
-    } else if (keys.length === 2) {
+    if (keys.length === 2) {
       var a = activePointers[keys[0]], b = activePointers[keys[1]];
       pinchStartDist = pointDist(a, b);
       pinchStartZoom = zoom;
       pinchStartMid = pointMid(a, b);
-      panStartX = null;
     }
   });
+
   scrollEl.addEventListener('pointermove', function (e) {
     if (!(e.pointerId in activePointers)) return;
     activePointers[e.pointerId] = { x: e.clientX, y: e.clientY };
@@ -452,23 +482,12 @@
       var ratio = pointDist(a, b) / pinchStartDist;
       var rect = scrollEl.getBoundingClientRect();
       applyZoom(pinchStartZoom * ratio, pinchStartMid.x - rect.left, pinchStartMid.y - rect.top);
-    } else if (keys.length === 1 && panStartX !== null) {
-      e.preventDefault();
-      scrollEl.scrollLeft = panStartScrollLeft - (e.clientX - panStartX);
-      scrollEl.scrollTop = panStartScrollTop - (e.clientY - panStartY);
     }
   }, { passive: false });
+
   function endPointerTrack(e) {
     delete activePointers[e.pointerId];
-    var remaining = Object.keys(activePointers);
-    if (remaining.length < 2) pinchStartDist = null;
-    if (remaining.length === 1) {
-      var k = remaining[0];
-      panStartX = activePointers[k].x; panStartY = activePointers[k].y;
-      panStartScrollLeft = scrollEl.scrollLeft; panStartScrollTop = scrollEl.scrollTop;
-    } else if (remaining.length === 0) {
-      panStartX = null;
-    }
+    if (Object.keys(activePointers).length < 2) pinchStartDist = null;
   }
   scrollEl.addEventListener('pointerup', endPointerTrack);
   scrollEl.addEventListener('pointercancel', endPointerTrack);
@@ -497,7 +516,6 @@
   }
 
   var lastTouchedBoxId = null;
-
   function schedulePersist(boxId) {
     if (boxId) lastTouchedBoxId = boxId;
     clearTimeout(persistTimer);
@@ -633,14 +651,12 @@
   function runBox(box, outputEl, canvasEl, boxEl) {
     cleanupCanvas(canvasEl);
     canvasEl.classList.add('has-content');
-
     var logs = [];
     var originalLog = console.log;
     console.log = function () {
       var args = Array.prototype.slice.call(arguments);
       logs.push(args.map(stringifyArg).join(' '));
     };
-
     var wrapped;
     try {
       wrapped = new Function('el', 'return (async function () {\n' + sanitizeCode(box.code) + '\n})()');
@@ -649,7 +665,6 @@
       finalizeRun(box, outputEl, canvasEl, boxEl, { logs: logs, hasResult: false, result: null, error: err.message });
       return;
     }
-
     Promise.resolve().then(function () {
       return wrapped(canvasEl);
     }).then(function (result) {
@@ -1192,6 +1207,7 @@
       settingsMenuEl.style.display = 'none';
     }
   });
+
   function jumpToBox() {
     if (boxes.length === 0) { alert('Inga rutor att hitta.'); return; }
     var list = boxes.map(function (b, i) { return (i + 1) + '. ' + boxDisplayName(b); }).join('\n');
@@ -1402,6 +1418,7 @@
   document.getElementById('zoomInBtn').addEventListener('click', function () { blurActive(); applyZoom(zoom * 1.25); });
   document.getElementById('zoomOutBtn').addEventListener('click', function () { blurActive(); applyZoom(zoom / 1.25); });
   document.getElementById('zoomLabel').addEventListener('click', function () { blurActive(); applyZoom(1); });
+
   if ('serviceWorker' in navigator) {
     navigator.serviceWorker.register('sw.js').catch(function () {
       // Not available in this context (e.g. the sandboxed Claude preview) -
