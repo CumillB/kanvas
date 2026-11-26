@@ -39,6 +39,11 @@ jobs:
       - name: Add Android platform
         run: npx cap add android
 
+      - name: Add microphone permission
+        run: |
+          sed -i 's#</manifest>#    <uses-permission android:name="android.permission.RECORD_AUDIO" />\n    <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS" />\n</manifest>#' android/app/src/main/AndroidManifest.xml
+          grep -n "permission" android/app/src/main/AndroidManifest.xml
+
       - name: Sync
         run: npx cap sync android
 
